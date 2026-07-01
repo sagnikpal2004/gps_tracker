@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GPS Telemetry & Device Monitoring Dashboard</title>
+    
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet Map CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="dark-theme" data-map-provider="google">
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Login Overlay Screen -->
+    <div id="login-screen" class="auth-overlay active">
+        <div class="auth-card">
+            <div class="auth-header">
+                <div class="logo">
+                    <i class="fa-solid fa-location-crosshairs icon-glow"></i>
+                    <span>Airtel <span class="accent-text">GPS Monitor</span></span>
+                </div>
+                <p>Telemetry & Device Management Center</p>
+            </div>
+            
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <div class="input-icon">
+                        <i class="fa-regular fa-user"></i>
+                        <input type="text" id="username" required placeholder="Enter username (e.g. admin)">
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="input-icon">
+                        <i class="fa-solid fa-lock"></i>
+                        <input type="password" id="password" required placeholder="Enter password (e.g. admin123)">
+                    </div>
+                </div>
+                
+                <button type="submit" id="login-btn" class="btn btn-primary btn-block">
+                    <span>Secure Sign In</span>
+                    <i class="fa-solid fa-arrow-right-to-bracket"></i>
+                </button>
+            </form>
+            
+            <div class="auth-footer">
+                <p>Default credentials (Username / Password):</p>
+                <ul>
+                    <li><strong>Admin:</strong> admin / admin123</li>
+                    <li><strong>Operator:</strong> operator / operator123</li>
+                    <li><strong>Viewer:</strong> viewer / viewer123</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Application Wrapper -->
+    <div id="app-container" class="app-layout">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar-nav">
+            <div class="brand">
+                <i class="fa-solid fa-location-crosshairs icon-glow"></i>
+                <h2>Airtel <span class="accent-text">GPS</span></h2>
+            </div>
+            
+            <nav class="nav-menu">
+                <a href="#" class="nav-item active" data-tab="live-map">
+                    <i class="fa-solid fa-map"></i>
+                    <span>Live Tracking</span>
+                </a>
+                <a href="#" class="nav-item" data-tab="history">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>Location History</span>
+                </a>
+                <a href="#" class="nav-item" data-tab="geofences">
+                    <i class="fa-solid fa-draw-polygon"></i>
+                    <span>Geofences</span>
+                </a>
+                <a href="#" class="nav-item" data-tab="alerts">
+                    <i class="fa-solid fa-bell"></i>
+                    <span>Alert Logs</span>
+                    <span id="nav-alerts-badge" class="badge bg-danger hidden">0</span>
+                </a>
+                <a href="#" class="nav-item" data-tab="analytics">
+                    <i class="fa-solid fa-chart-simple"></i>
+                    <span>Analytics</span>
+                </a>
+                <a href="#" class="nav-item admin-only" data-tab="devices-mgmt">
+                    <i class="fa-solid fa-microchip"></i>
+                    <span>Devices Registry</span>
+                </a>
+                <a href="#" class="nav-item admin-only" data-tab="audit-logs">
+                    <i class="fa-solid fa-book-open"></i>
+                    <span>Audit Logs</span>
+                </a>
+            </nav>
+            
+            <div class="sidebar-footer">
+                <div class="user-profile">
+                    <div class="avatar">
+                        <i class="fa-solid fa-circle-user"></i>
+                    </div>
+                    <div class="user-details">
+                        <h4 id="profile-username">Admin User</h4>
+                        <span id="profile-role" class="badge-role">Admin</span>
+                    </div>
+                </div>
+                <button id="logout-btn" class="btn btn-icon-only text-danger" title="Logout">
+                    <i class="fa-solid fa-power-off"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Body Area -->
+        <main class="main-content">
+            
+            <!-- Global Top Header -->
+            <header class="content-header">
+                <div class="header-left">
+                    <h1 id="current-tab-title">Live Tracking Map</h1>
+                    <p id="current-tab-desc">Real-time coordinates streamed from MAK tracking hardware via Google Find Hub API.</p>
+                </div>
+                
+                <div class="header-right">
+                    <!-- Simulator Quick Control -->
+                    <div class="simulator-quick-panel">
+                        <span class="status-indicator-dot online" id="sim-status-dot"></span>
+                        <span class="sim-label">Find Hub Simulator:</span>
+                        <div class="switch-container">
+                            <label class="switch">
+                                <input type="checkbox" id="sim-toggle-checkbox" checked>
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                        <button id="sim-reset-btn" class="btn btn-secondary btn-sm" title="Reset all simulator device paths">
+                            <i class="fa-solid fa-rotate-left"></i>
+                        </button>
+                    </div>
+
+                    <!-- Notification Bell Dropdown Button -->
+                    <div class="notification-bell" id="bell-dropdown-btn">
+                        <i class="fa-solid fa-bell"></i>
+                        <span class="bell-badge hidden" id="bell-badge-count">0</span>
+                        
+                        <!-- Mini Dropdown Content -->
+                        <div class="bell-dropdown" id="bell-dropdown-menu">
+                            <div class="dropdown-header">
+                                <h3>Recent Alerts</h3>
+                                <a href="#" id="mark-all-read-btn">Mark all read</a>
+                            </div>
+                            <div class="dropdown-list" id="mini-alerts-list">
+                                <div class="empty-state">No unread alerts.</div>
+                            </div>
+                            <div class="dropdown-footer">
+                                <a href="#" class="view-all-alerts-link">View all alert logs</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Application Screen Containers -->
+            <div class="tab-viewports">
+                
+                <!-- 1. LIVE MAP VIEWPORT -->
+                <div class="viewport active" id="viewport-live-map">
+                    <div class="map-layout">
+                        <!-- Sidebar Panel Inside Map -->
+                        <div class="map-sidebar">
+                            <div class="search-panel">
+                                <div class="input-icon">
+                                    <i class="fa-solid fa-magnifying-glass"></i>
+                                    <input type="text" id="device-search" placeholder="Search devices/assets...">
+                                </div>
+                                <div class="filter-pills">
+                                    <button class="filter-pill active" data-filter="all">All</button>
+                                    <button class="filter-pill" data-filter="online">Online</button>
+                                    <button class="filter-pill" data-filter="offline">Offline</button>
+                                </div>
+                            </div>
+                            
+                            <div class="device-list-container" id="live-device-list">
+                                <!-- Dynamic device items will go here -->
+                                <div class="loading-spinner"><i class="fa-solid fa-spinner fa-spin"></i> Loading devices...</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Actual Map Viewport -->
+                        <div class="map-wrapper">
+                            <div id="live-map" class="map-canvas"></div>
+                            
+                            <!-- Floating Device Legend/Status Panel -->
+                            <div class="map-overlay-card hidden" id="selected-device-overlay">
+                                <button class="close-overlay-btn" id="close-overlay-btn"><i class="fa-solid fa-xmark"></i></button>
+                                <div class="overlay-header">
+                                    <h3 id="overlay-dev-name">Device Name</h3>
+                                    <span class="badge" id="overlay-dev-status">Online</span>
+                                </div>
+                                <div class="overlay-body">
+                                    <div class="stat-row">
+                                        <span>Hardware ID:</span>
+                                        <strong id="overlay-dev-hw">MAK-001</strong>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span>Assigned Asset:</span>
+                                        <strong id="overlay-dev-asset">N/A</strong>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span>Coordinates:</span>
+                                        <strong id="overlay-dev-coords">0.0, 0.0</strong>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span>Current Speed:</span>
+                                        <strong id="overlay-dev-speed">0 km/h</strong>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span>Battery Level:</span>
+                                        <div class="battery-battery">
+                                            <span id="overlay-dev-battery">85%</span>
+                                            <i class="fa-solid fa-battery-three-quarters" id="overlay-dev-battery-icon"></i>
+                                        </div>
+                                    </div>
+                                    <div class="stat-row">
+                                        <span>Last Report:</span>
+                                        <span id="overlay-dev-time" class="timestamp-text">Just now</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. LOCATION HISTORY VIEWPORT -->
+                <div class="viewport" id="viewport-history">
+                    <div class="history-layout">
+                        <!-- Sidebar Panel for Selecting Device & Time Ranges -->
+                        <div class="history-controls-panel">
+                            <h3>Query Location History</h3>
+                            <p class="section-desc">Analyze past trajectories, view recorded route lines, and replay device movements.</p>
+                            
+                            <form id="history-query-form">
+                                <div class="form-group">
+                                    <label for="history-device-select">Select Device</label>
+                                    <select id="history-device-select" class="form-control" required>
+                                        <option value="">-- Choose Device --</option>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="history-start-time">Start Time</label>
+                                    <input type="datetime-local" id="history-start-time" class="form-control" required>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label for="history-end-time">End Time</label>
+                                    <input type="datetime-local" id="history-end-time" class="form-control" required>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary btn-block">
+                                    <i class="fa-solid fa-magnifying-glass-location"></i>
+                                    <span>Query Trajectory</span>
+                                </button>
+                            </form>
+                            
+                            <div class="history-replay-panel hidden" id="history-replay-panel">
+                                <h4>Replay Trajectory</h4>
+                                
+                                <div class="playback-controls">
+                                    <button id="playback-btn-play" class="btn btn-circle" title="Play"><i class="fa-solid fa-play"></i></button>
+                                    <button id="playback-btn-pause" class="btn btn-circle hidden" title="Pause"><i class="fa-solid fa-pause"></i></button>
+                                    
+                                    <div class="speed-selector">
+                                        <select id="playback-speed-select" class="form-control-sm">
+                                            <option value="1">1x Speed</option>
+                                            <option value="5">5x Speed</option>
+                                            <option value="10">10x Speed</option>
+                                            <option value="25">25x Speed</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="slider-progress-container">
+                                    <input type="range" id="playback-range-slider" min="0" max="100" value="0">
+                                    <div class="slider-labels">
+                                        <span id="playback-current-time">00:00</span>
+                                        <span id="playback-speed-val">0 km/h</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="trajectory-summary-card">
+                                    <div class="summary-item">
+                                        <span>Total Points:</span>
+                                        <strong id="history-summary-points">0</strong>
+                                    </div>
+                                    <div class="summary-item">
+                                        <span>Avg Speed:</span>
+                                        <strong id="history-summary-speed">0 km/h</strong>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- History Map Viewport -->
+                        <div class="history-map-wrapper">
+                            <div id="history-map" class="map-canvas"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. GEOFENCES VIEWPORT -->
+                <div class="viewport" id="viewport-geofences">
+                    <div class="geofence-layout">
+                        <!-- Geofence Management List -->
+                        <div class="geofence-panel-left">
+                            <div class="panel-header">
+                                <h3>Active Geofences</h3>
+                                <button class="btn btn-primary btn-sm operator-only" id="btn-show-add-geofence">
+                                    <i class="fa-solid fa-plus"></i> Add Geofence
+                                </button>
+                            </div>
+                            
+                            <!-- Add Geofence Inline Panel -->
+                            <div class="add-geofence-card hidden" id="add-geofence-card">
+                                <h4>Create Virtual Border</h4>
+                                <form id="add-geofence-form">
+                                    <div class="form-group">
+                                        <label for="gf-name">Geofence Name</label>
+                                        <input type="text" id="gf-name" required placeholder="e.g. Okhla Warehouse" class="form-control">
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group col">
+                                            <label for="gf-lat">Latitude</label>
+                                            <input type="number" step="any" id="gf-lat" required placeholder="28.472" class="form-control">
+                                        </div>
+                                        <div class="form-group col">
+                                            <label for="gf-lon">Longitude</label>
+                                            <input type="number" step="any" id="gf-lon" required placeholder="77.072" class="form-control">
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="gf-radius">Radius (meters)</label>
+                                        <input type="number" id="gf-radius" required placeholder="e.g. 500" class="form-control">
+                                    </div>
+                                    
+                                    <p class="help-text"><i class="fa-solid fa-info-circle"></i> Tip: You can also double click on the geofence map to capture coordinates directly.</p>
+                                    
+                                    <div class="form-actions">
+                                        <button type="button" class="btn btn-secondary" id="btn-cancel-geofence">Cancel</button>
+                                        <button type="submit" class="btn btn-primary">Save Geofence</button>
+                                    </div>
+                                </form>
+                            </div>
+                            
+                            <div class="geofence-list" id="geofence-list-items">
+                                <!-- Dynamically loaded geofences -->
+                            </div>
+                        </div>
+                        
+                        <!-- Map Displaying Geofences -->
+                        <div class="geofence-map-wrapper">
+                            <div id="geofence-map" class="map-canvas"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. ALERTS LOG VIEWPORT -->
+                <div class="viewport" id="viewport-alerts">
+                    <div class="alerts-log-container">
+                        <div class="alerts-header">
+                            <div>
+                                <h3>Alert & Violation Audit Logs</h3>
+                                <p class="section-desc">Track boundary crossings, critical power drops, and unexpected device telemetry failures.</p>
+                            </div>
+                            <div class="alerts-actions operator-only">
+                                <button class="btn btn-secondary btn-sm" id="alerts-refresh-btn"><i class="fa-solid fa-rotate"></i> Refresh</button>
+                                <button class="btn btn-primary btn-sm" id="alerts-clear-btn"><i class="fa-solid fa-square-check"></i> Mark All Read</button>
+                            </div>
+                        </div>
+                        
+                        <div class="table-container">
+                            <table class="dashboard-table" id="alerts-full-table">
+                                <thead>
+                                    <tr>
+                                        <th>Device Name</th>
+                                        <th>Alert Type</th>
+                                        <th>Log Message</th>
+                                        <th>Timestamp</th>
+                                        <th>Status</th>
+                                        <th class="operator-only">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="alerts-table-body">
+                                    <!-- Dynamic rows loaded from /api/alerts -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. ANALYTICS VIEWPORT -->
+                <div class="viewport" id="viewport-analytics">
+                    <div class="analytics-container">
+                        <!-- KPI Widget Grid -->
+                        <div class="kpi-grid">
+                            <div class="kpi-card">
+                                <div class="kpi-icon text-primary"><i class="fa-solid fa-microchip"></i></div>
+                                <div class="kpi-details">
+                                    <span class="kpi-title">Registered Trackers</span>
+                                    <h2 id="kpi-total-devices">0</h2>
+                                </div>
+                            </div>
+                            
+                            <div class="kpi-card">
+                                <div class="kpi-icon text-success"><i class="fa-solid fa-wifi"></i></div>
+                                <div class="kpi-details">
+                                    <span class="kpi-title">Online/Moving</span>
+                                    <h2 id="kpi-online-devices">0</h2>
+                                </div>
+                            </div>
+                            
+                            <div class="kpi-card">
+                                <div class="kpi-icon text-danger"><i class="fa-solid fa-circle-exclamation"></i></div>
+                                <div class="kpi-details">
+                                    <span class="kpi-title">Active Alerts</span>
+                                    <h2 id="kpi-unread-alerts">0</h2>
+                                </div>
+                            </div>
+                            
+                            <div class="kpi-card">
+                                <div class="kpi-icon text-warning"><i class="fa-solid fa-draw-polygon"></i></div>
+                                <div class="kpi-details">
+                                    <span class="kpi-title">Active Geofences</span>
+                                    <h2 id="kpi-total-geofences">0</h2>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Charts & Metrics Row -->
+                        <div class="analytics-charts-row">
+                            <div class="chart-card">
+                                <h3>Telemetry Activity Frequency</h3>
+                                <p class="chart-desc">Historical data synchronization points logged per minute.</p>
+                                <div class="chart-canvas-container">
+                                    <canvas id="telemetry-chart"></canvas>
+                                </div>
+                            </div>
+                            
+                            <div class="chart-card">
+                                <h3>Device Online Ratio</h3>
+                                <p class="chart-desc">Ratio of online/moving communication devices relative to registered tags.</p>
+                                <div class="chart-canvas-container doughnut-container">
+                                    <canvas id="ratio-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. DEVICES REGISTRY VIEWPORT (Admin Only) -->
+                <div class="viewport" id="viewport-devices-mgmt">
+                    <div class="registry-container">
+                        <div class="registry-header">
+                            <div>
+                                <h3>Tracking Device Registry</h3>
+                                <p class="section-desc">Manage MAK location tracking tags, assign hardware IDs to assets, and deploy tracking sensors.</p>
+                            </div>
+                            <button class="btn btn-primary" id="btn-show-add-device-modal">
+                                <i class="fa-solid fa-plus"></i> Register Tracker Tag
+                            </button>
+                        </div>
+                        
+                        <div class="table-container">
+                            <table class="dashboard-table" id="devices-table">
+                                <thead>
+                                    <tr>
+                                        <th>Hardware ID</th>
+                                        <th>Device Display Name</th>
+                                        <th>Assigned Asset / Equipment</th>
+                                        <th>Tracking Status</th>
+                                        <th>Last Active Sync</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="devices-table-body">
+                                    <!-- Dynamic rows loaded from /api/devices -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 7. AUDIT LOGS VIEWPORT (Admin Only) -->
+                <div class="viewport" id="viewport-audit-logs">
+                    <div class="audit-container">
+                        <div class="audit-header">
+                            <h3>Security & Administration Audit Trail</h3>
+                            <p class="section-desc">Inspect configuration shifts, user login/logout occurrences, and management commands.</p>
+                        </div>
+                        
+                        <div class="table-container">
+                            <table class="dashboard-table" id="audit-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>Operator Username</th>
+                                        <th>Triggered Event</th>
+                                        <th>Execution Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="audit-table-body">
+                                    <!-- Dynamic rows loaded from /api/audit-logs -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Register Device Modal Dialog (Admin Only) -->
+    <div id="device-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="device-modal-title">Register New GPS Tag</h3>
+                <button class="close-modal-btn" id="close-device-modal-btn"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <form id="device-modal-form">
+                <input type="hidden" id="modal-device-id">
+                
+                <div class="form-group">
+                    <label for="modal-hw-id">Hardware ID / MAC Address</label>
+                    <input type="text" id="modal-hw-id" required placeholder="e.g. MAK-005" class="form-control">
+                    <p class="help-text">Unique identifier matching the Find Hub device registry metadata.</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="modal-name">Display Name</label>
+                    <input type="text" id="modal-name" required placeholder="e.g. Field Service Van 4" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                    <label for="modal-asset">Assigned Asset / Operator</label>
+                    <input type="text" id="modal-asset" placeholder="e.g. Engr. Amit or Airtel Tower Gen 9" class="form-control">
+                </div>
+                
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" id="btn-cancel-device-modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btn-save-device-modal">Register Tag</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Leaflet Map JS dependencies -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <!-- Google Maps API and Leaflet Google Tile Plugin -->
+    <script src="https://maps.googleapis.com/maps/api/js"></script>
+    <script src="https://unpkg.com/leaflet.gridlayer.googlemutant@latest/dist/Leaflet.GoogleMutant.js"></script>
+    <!-- Chart.js dependency -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Custom JS Scripts -->
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/map.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
