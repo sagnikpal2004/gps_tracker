@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+*.egg-info/
+
+# Database (contains live data, don't push)
+*.db
+*.sqlite
+
+# Environment / secrets
+.env
+*.env
+Auth/secrets.json
+
+# OS
+.DS_Store
+Thumbs.db
