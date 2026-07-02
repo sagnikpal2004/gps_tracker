@@ -95,7 +95,7 @@ const API = {
     // Devices
     async getDevices() {
         // return await apiFetch("/api/devices");
-        return await apiFetch("http://findhubapi.onrender.com/devices");
+        return await apiFetch("https://findhubapi.onrender.com/devices");
     },
     
     async createDevice(hardware_id, name, assigned_asset) {
