@@ -271,9 +271,9 @@ def get_me(user = Depends(get_current_user)):
     return user
 
 # 2. Devices Management Endpoints
-@app.get("/api/devices")
-def list_devices(user = Depends(get_current_user)):
-    return database.get_all_devices()
+# @app.get("/api/devices")
+# def list_devices(user = Depends(get_current_user)):
+#     return database.get_all_devices()
 
 @app.post("/api/devices")
 def create_device(req: DeviceCreate, user = Depends(check_role(["Admin"]))):

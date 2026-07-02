@@ -377,7 +377,7 @@ function startPolling() {
         } else if (AppState.activeTab === "analytics") {
             fetchAnalytics();
         }
-    }, 5000);
+    }, 300000); // 5 minutes
 }
 
 function stopPolling() {
@@ -392,7 +392,7 @@ async function fetchDevices() {
     try {
         const devices = await API.getDevices();
         AppState.devices = devices;
-        
+
         // Update list sidebar
         renderDeviceList(devices);
         
